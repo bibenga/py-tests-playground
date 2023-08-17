@@ -7,21 +7,21 @@ import trustme
 from aiohttp import ClientConnectorCertificateError, ServerDisconnectedError, web
 
 
-async def public(request: web.Request) -> web.Response:
-    """ method without authorization """
-    return web.Response(status=428)
-
-
-async def secured(request: web.Request) -> web.Response:
-    """ method with authorization """
-    peercert = request.transport.get_extra_info("peercert")
-    if peercert is None:  # additional authorization can be implements
-        return web.Response(status=403)
-    return web.Response(status=428)
-
-
 @pytest.fixture
 async def app() -> web.Application:
+    """ demo application """
+
+    async def public(_request: web.Request) -> web.Response:
+        """ method without authorization """
+        return web.Response(status=428)
+
+    async def secured(request: web.Request) -> web.Response:
+        """ method with authorization """
+        peercert = request.transport.get_extra_info("peercert")
+        if peercert is None:  # additional authorization can be implements
+            return web.Response(status=403)
+        return web.Response(status=428)
+
     app = web.Application()
     app.router.add_get('/public', public)
     app.router.add_get('/secured', secured)
@@ -30,6 +30,7 @@ async def app() -> web.Application:
 
 @dataclass
 class SslTestCfg:
+    """SSL configuration for tests"""
     ca: trustme.CA
     server_cert: trustme.LeafCert
     client_cert: trustme.LeafCert
@@ -40,6 +41,8 @@ class SslTestCfg:
 
 @pytest.fixture
 def ssl_cfg() -> SslTestCfg:
+    """ create ssl configuration for test """
+
     ca = trustme.CA()
     server_cert = ca.issue_cert("127.0.0.1", "localhost")
     client_cert = ca.issue_cert("client@127.0.0.1")
@@ -47,13 +50,12 @@ def ssl_cfg() -> SslTestCfg:
     server_ssl = ssl.create_default_context(ssl.Purpose.CLIENT_AUTH)
     ca.configure_trust(server_ssl)
     server_cert.configure_cert(server_ssl)
-    # server_ssl.verify_mode = verify_mode
 
-    # create client cert
+    # create context for server validation
     anon_ssl = ssl.create_default_context()
     ca.configure_trust(anon_ssl)
 
-    # create client cert
+    # create context with client certificate and server validation
     user_ssl = ssl.create_default_context()
     ca.configure_trust(user_ssl)
     client_cert.configure_cert(user_ssl)
