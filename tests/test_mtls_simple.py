@@ -29,14 +29,12 @@ async def test_mtls_short(aiohttp_client, aiohttp_server) -> None:
         return ctx
 
     # create server with ssl
-    server_ssl_ctx = create_ssl_context(
-        ssl.Purpose.CLIENT_AUTH, ca, server_cert)
+    server_ssl_ctx = create_ssl_context(ssl.Purpose.CLIENT_AUTH, ca, server_cert)
     server_ssl_ctx.verify_mode = ssl.CERT_OPTIONAL
     client = await aiohttp_client(await aiohttp_server(app, ssl=server_ssl_ctx))
 
     # connect with user client cert
-    client_ssl_ctx = create_ssl_context(
-        ssl.Purpose.SERVER_AUTH, ca, client_cert)
+    client_ssl_ctx = create_ssl_context(ssl.Purpose.SERVER_AUTH, ca, client_cert)
     resp = await client.get('/secured', ssl=client_ssl_ctx)
     assert resp.status == 428
 
