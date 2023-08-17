@@ -14,7 +14,8 @@ async def public(request: web.Request) -> web.Response:
 async def secured(request: web.Request) -> web.Response:
     """ method with authorization """
     peercert = request.transport.get_extra_info("peercert")
-    assert peercert is not None
+    if peercert is None:  # additional authorization can be implements
+        return web.Response(status=403)
     return web.Response(status=428)
 
 
@@ -31,6 +32,10 @@ async def get_client(aiohttp_client, aiohttp_server, verify_mode):
     server_ssl_context.verify_mode = verify_mode
 
     # create client cert
+    client_anonymous_ssl_context = ssl.create_default_context()
+    ca.configure_trust(client_anonymous_ssl_context)
+
+    # create client cert
     client_ssl_context = ssl.create_default_context()
     ca.configure_trust(client_ssl_context)
     client_cert.configure_cert(client_ssl_context)
@@ -44,14 +49,14 @@ async def get_client(aiohttp_client, aiohttp_server, verify_mode):
     server = await aiohttp_server(app, ssl=server_ssl_context)
     client = await aiohttp_client(server)
 
-    return client, client_ssl_context
+    return client, client_ssl_context, client_anonymous_ssl_context
 
 
 @pytest.mark.asyncio
 async def test_https(aiohttp_client, aiohttp_server, loop):
     """test https server without client cert"""
 
-    client, _ = await get_client(aiohttp_client, aiohttp_server, ssl.CERT_NONE)
+    client, _, _ = await get_client(aiohttp_client, aiohttp_server, ssl.CERT_NONE)
 
     # connect with cert validation
     try:
@@ -66,10 +71,10 @@ async def test_https(aiohttp_client, aiohttp_server, loop):
 
 
 @pytest.mark.asyncio
-async def test_mtls(aiohttp_client, aiohttp_server, loop):
-    """ test https server with client cert """
+async def test_mtls_required(aiohttp_client, aiohttp_server, loop):
+    """ test https server with client cert and server require certeficate """
 
-    client, client_ssl_context = await get_client(aiohttp_client, aiohttp_server, ssl.CERT_REQUIRED)
+    client, client_ssl_context, _ = await get_client(aiohttp_client, aiohttp_server, ssl.CERT_REQUIRED)
 
     # connect without client cert but with cert validation 
     try:
@@ -90,3 +95,19 @@ async def test_mtls(aiohttp_client, aiohttp_server, loop):
     # connect with client cert
     resp = await client.get('/secured', ssl=client_ssl_context)
     assert resp.status == 428
+
+@pytest.mark.asyncio
+async def test_mtls_optional(aiohttp_client, aiohttp_server, loop):
+    """ test https server with client cert and server can accept certeficate """
+
+    client, client_ssl_context, client_anonymous_ssl_context = await get_client(aiohttp_client, aiohttp_server, ssl.CERT_OPTIONAL)
+
+    # connect as anonymous client
+    resp = await client.get('/secured', ssl=client_anonymous_ssl_context)
+    assert resp.status == 403
+
+    # connect as user with valid cert
+    resp = await client.get('/secured', ssl=client_ssl_context)
+    assert resp.status == 428
+
+
