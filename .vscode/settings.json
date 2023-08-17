@@ -1,0 +1,8 @@
+{
+    "python.testing.pytestArgs": [
+        "-o", "log_cli=True",
+        "-o", "log_cli_level=INFO"
+    ],
+    "python.testing.pytestEnabled": true,
+    "python.testing.unittestEnabled": false
+}

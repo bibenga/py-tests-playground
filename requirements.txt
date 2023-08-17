@@ -1,0 +1,7 @@
+pytest
+pytest-asyncio
+
+trustme
+
+aiohttp
+pytest-aiohttp
